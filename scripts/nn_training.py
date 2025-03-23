@@ -13,10 +13,12 @@ class FeedForwardNN(nn.Module):
         super(FeedForwardNN, self).__init__()
         
         self.layer1 = nn.Linear(input_size, 16)  # First hidden layer
-        self.layer2 = nn.Linear(16, 32)          # Second hidden layer
-        self.layer3 = nn.Linear(32, 16)          # Third hidden layer
-        self.output_layer = nn.Linear(16, output_size)  # Output layer
+        self.layer2 = nn.Linear(16, 64)          # Second hidden layer
+        self.layer3 = nn.Linear(64, 64)          # Third hidden layer
+        self.output_layer = nn.Linear(64, output_size)  # Output layer
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.1)
+        self.dropout = nn.Dropout(0.5)   # Dropout layer with specified probability
+
 
     def forward(self, x):
         # x = torch.relu(self.layer1(x))   # Apply ReLU activation after the first layer
@@ -25,7 +27,7 @@ class FeedForwardNN(nn.Module):
         x = self.leaky_relu(self.layer1(x))   # Apply LeakyReLU after the first layer
         x = self.leaky_relu(self.layer2(x))   # Apply LeakyReLU after the second layer
         x = self.leaky_relu(self.layer3(x))   # Apply LeakyReLU after the third layer
-
+        x = self.dropout(x) 
         x = self.output_layer(x)         # No activation for output layer (regression task)
         return x
 

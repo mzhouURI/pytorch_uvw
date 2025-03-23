@@ -5,7 +5,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TwistWithCovarianceStamped
 import pandas as pd
 
-bag_file = '../bags/2025-03-13-14-43-13.bag'
+bag_file = '../../bags/2025-03-13-14-43-13.bag'
 
 thruster_topics = ['/alpha_rise/control/thruster/surge',
                    '/alpha_rise/control/thruster/sway_bow',
@@ -19,8 +19,9 @@ thruster_data = {topic: [] for topic in thruster_topics}
 ##read odom
 twist_topic = '/alpha_rise/odometry/filtered/local'
 dvl_topic = '/alpha_rise/dvl/twist'
+imu_topic = '/alpha_rise/imu/data'
 odom_twist = []
-
+imu_data = []
 
 
 # Open the bag file and read the messages
@@ -38,6 +39,9 @@ with rosbag.Bag(bag_file, 'r') as bag:
         odom_twist.append([timestamp, twist.linear.x, twist.linear.y, twist.linear.z])
         # else:
             # print(f"Skipping message of type {type(msg)}")  # Print the type if it's not Odometry
+    for topic, msg, t in bag.read_messages(topics=[imu_topic]):
+        timestamp = msg.header.stamp.to_sec() - start_time
+        imu_data.append([timestamp, msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z, msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z])
 
 #manually remove the first entry of surge, sway and HB 
 # thruster_data[thruster_topics[0]] = thruster_data[thruster_topics[0]][1:]
@@ -52,7 +56,7 @@ hs_data = np.array(thruster_data[thruster_topics[3]])
 
 
 odom_twist_array = np.array(odom_twist)
-
+imu_data_array = np.array(imu_data)
 # print(odom_twist_array.shape)
 
 # plt.figure(figsize=(10, 6))
@@ -73,6 +77,15 @@ sway_timestamps = sway_data[:, 0]
 hb_timestamps = hb_data[:, 0]
 hs_timestamps = hs_data[:, 0]
 
+print(imu_data_array.shape)
+imu_t = imu_data_array[:, 0]
+imu_ax = imu_data_array[:,1]
+imu_ay = imu_data_array[:,2]
+imu_az = imu_data_array[:,3]
+imu_rx = imu_data_array[:,4]
+imu_ry = imu_data_array[:,5]
+imu_rz = imu_data_array[:,6]
+
 # Values
 surge_values = surge_data[:, 1]
 sway_values = sway_data[:, 1]
@@ -85,15 +98,23 @@ interpolated_sway = np.interp(odom_timestamps, sway_timestamps, sway_values)
 interpolated_hb = np.interp(odom_timestamps, hb_timestamps, hb_values)
 interpolated_hs = np.interp(odom_timestamps, hs_timestamps, hs_values)
 
+interpolated_ax = np.interp(odom_timestamps, imu_t, imu_ax)
+interpolated_ay = np.interp(odom_timestamps, imu_t, imu_ay)
+interpolated_az = np.interp(odom_timestamps, imu_t, imu_az)
+interpolated_rx = np.interp(odom_timestamps, imu_t, imu_rx)
+interpolated_ry = np.interp(odom_timestamps, imu_t, imu_ry)
+interpolated_rz = np.interp(odom_timestamps, imu_t, imu_rz)
+
 # Combine into a single array
 interpolated_thruster_data = np.vstack([interpolated_surge, interpolated_sway, interpolated_hb, interpolated_hs]).T
 
+interpolated_imu_data = np.vstack([interpolated_ax, interpolated_ay, interpolated_az, interpolated_rx, interpolated_ry, interpolated_rz]).T
 # Add odom timestamps as the first column if needed
-final_data = np.column_stack([odom_twist_array, interpolated_thruster_data])
+final_data = np.column_stack([odom_twist_array, interpolated_thruster_data, interpolated_imu_data])
 
 print(final_data.shape)
 
-np.savetxt('test_data.csv', final_data, delimiter=',', header='timestamp,u,v,w,surge,sway,hb,hs', comments='', fmt='%f')
+np.savetxt('training_data.csv', final_data, delimiter=',', header='timestamp,u,v,w,surge,sway,hb,hs,ax,ay,az,rx,ry,rz', comments='', fmt='%f')
 
 
 # Plotting
